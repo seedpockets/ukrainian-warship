@@ -16,12 +16,39 @@ Ukrainian Warship features:
 - Automatically detects online targets
 - Stolen code from popular https stress test tool
 - The pockets of dead target will gown sunflowers
+<br>
+<br>
 
-##### Usage
-```
+# Install
+
+##### AWS EC2 User Data for Ubuntu Server 20.04 LTS
+``` bash
+#!/bin/bash
+
+apt update -y
+apt upgrade -y
+tar -C /usr/local -xvf go1.17.7.linux-amd64.tar.gz
+echo export PATH=$PATH:/usr/local/go/bin >> ~/.profile
+source ~/.profile
 git clone https://github.com/seedpockets/ukrainian-warship.git
 cd ukrainian-warship/
-chmod +x /bin/ukrainian-warship-linux
-./bin/ukrainian-warship-linux kill    
+go build -ldflags "-s -w" -o bin/ukrainian-warship
+chmod +x /bin/ukrainian-warship
+./bin/ukrainian-warship kill    
 ```
 
+##### Ubuntu Server 20.04 LTS
+``` bash
+#!/bin/bash
+
+sudo apt update -y
+sudo apt upgrade -y
+sudo tar -C /usr/local -xvf go1.17.7.linux-amd64.tar.gz
+sudo echo export PATH=$PATH:/usr/local/go/bin >> ~/.profile
+sudo source ~/.profile
+git clone https://github.com/seedpockets/ukrainian-warship.git
+cd ukrainian-warship/
+go build -ldflags "-s -w" -o bin/ukrainian-warship
+chmod +x /bin/ukrainian-warship
+./bin/ukrainian-warship kill    
+```
