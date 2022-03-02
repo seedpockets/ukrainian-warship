@@ -21,8 +21,14 @@ Ukrainian Warship features:
 
 # Install
 
+##### Docker
+```bash
+docker sunflowerpockets/ukrainian
+docker run -ti --rm sunflowerpockets/ukrainian-warship:latest
+```
+
 ##### AWS EC2 User Data for Ubuntu Server 20.04 LTS
-``` bash
+```bash
 #!/bin/bash
 
 apt update -y
@@ -38,7 +44,7 @@ chmod +x /bin/ukrainian-warship
 ```
 
 ##### Ubuntu Server 20.04 LTS
-``` bash
+```bash
 #!/bin/bash
 
 sudo apt update -y
