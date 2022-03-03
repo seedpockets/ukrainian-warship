@@ -58,3 +58,23 @@ go build -ldflags "-s -w" -o bin/ukrainian-warship
 chmod +x /bin/ukrainian-warship
 ./bin/ukrainian-warship kill    
 ```
+
+Example output:
+```
+ Updates targets every 5 min...
+
+
+Target
+_________________________________________________________
+https://www.nornickel.com/
+https://rmk-group.ru/ru/
+https://www.evraz.com/ru/
+https://nangs.org/
+https://www.metalloinvest.com/
+https://www.polymetalinternational.com/ru/
+https://www.sibur.ru/
+https://www.uralkali.com/ru/
+https://www.tmk-group.ru/
+Total:  10
+⣻
+```
