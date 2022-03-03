@@ -33,15 +33,16 @@ docker run -ti --rm sunflowerpockets/ukrainian-warship:latest
 
 apt update -y
 apt upgrade -y
+cd root
 curl -OL https://go.dev/dl/go1.17.7.linux-amd64.tar.gz
 tar -C /usr/local -xvf go1.17.7.linux-amd64.tar.gz
-echo export PATH=$PATH:/usr/local/go/bin >> ~/.profile
-source ~/.profile
+echo export PATH=$PATH:/usr/local/go/bin >> /root/.profile
+source /root/.profile
 git clone https://github.com/seedpockets/ukrainian-warship.git
 cd ukrainian-warship/
-go build -ldflags "-s -w" -o bin/ukrainian-warship
-chmod +x /bin/ukrainian-warship
-./bin/ukrainian-warship kill    
+go build -ldflags "-s -w" -o /root/ukrainian-warship/bin/ukrainian-warship
+chmod +x /root/ukrainian-warship/bin/ukrainian-warship
+./root/ukrainian-warship/bin/ukrainian-warship kill   
 ```
 
 ##### Ubuntu Server 20.04 LTS
@@ -50,16 +51,15 @@ chmod +x /bin/ukrainian-warship
 
 sudo apt update -y
 sudo apt upgrade -y
-cd /root
 curl -OL https://go.dev/dl/go1.17.7.linux-amd64.tar.gz
 sudo tar -C /usr/local -xvf go1.17.7.linux-amd64.tar.gz
-echo export PATH=$PATH:/usr/local/go/bin >> root/.profile
-source root/.profile
+echo export PATH=$PATH:/usr/local/go/bin >> ~/.profile
+source ~/.profile
 git clone https://github.com/seedpockets/ukrainian-warship.git
 cd ukrainian-warship/
 go build -ldflags "-s -w" -o bin/ukrainian-warship
-chmod +x /root/ukrainian-warship/bin/ukrainian-warship
-./root/ukrainian-warship/bin/ukrainian-warship kill    
+chmod +x /bin/ukrainian-warship
+./bin/ukrainian-warship kill    
 ```
 
 Example output:
