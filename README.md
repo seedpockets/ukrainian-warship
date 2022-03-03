@@ -23,7 +23,7 @@ Ukrainian Warship features:
 
 ##### Docker
 ```bash
-docker sunflowerpockets/ukrainian
+docker pull sunflowerpockets/ukrainian-warship:latest
 docker run -ti --rm sunflowerpockets/ukrainian-warship:latest
 ```
 
