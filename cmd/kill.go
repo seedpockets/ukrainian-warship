@@ -110,11 +110,23 @@ func KillAll(workers int, refreshRate float64, debug bool) {
 }
 
 func getTargets() (*api_client.Targets, error) {
-	clearScreen()
 	fmt.Println("Acquiring targets...")
+	targets := &api_client.Targets{}
 	targets, err := api_client.GetTargets()
 	if err != nil {
 		return nil, err
+	}
+	if len(targets.Online) <= 0 {
+		haveTargets := false
+		for !haveTargets {
+			targets, err = api_client.GetTargets()
+			if err != nil {
+				return nil, err
+			}
+			if len(targets.Online) > 0 {
+				haveTargets = true
+			}
+		}
 	}
 	fmt.Println("Done...")
 	return targets, nil
