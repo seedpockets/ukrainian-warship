@@ -35,7 +35,7 @@ var killCmd = &cobra.Command{
 Periodically updates target list and evenly spreads load among online
 targets.
 
-Default worker amount is 24 divided by number of targets.`,
+Default worker amount is 5 per target.`,
 	Run: func(cmd *cobra.Command, args []string) {
 		singleTarget, _ := cmd.Flags().GetString("target")
 		debug, _ := cmd.Flags().GetBool("debug")
@@ -54,7 +54,7 @@ Default worker amount is 24 divided by number of targets.`,
 
 func init() {
 	rootCmd.AddCommand(killCmd)
-	killCmd.Flags().Int("workers", 64, "--workers=1024 ")
+	killCmd.Flags().Int("workers", 5, "--workers=1024 set number of workers per target")
 	killCmd.Flags().String("target", "", "--target=https://ww.rt.com takes aim at a single target")
 	killCmd.Flags().Float64("refresh", 5, "--refresh=10 number of minutes between refreshing target URLs")
 	killCmd.Flags().Bool("debug", false, "--debug=true defaults to false")
@@ -82,9 +82,8 @@ func KillAll(workers int, refreshRate float64, debug bool) {
 				fmt.Println("Could not get targets")
 				panic(err.Error())
 			}
-			var w = workers / len(targets.Online)
 			for i := 0; i < len(targets.Online); i++ {
-				warship, err := stresstest.New(targets.Online[i], debug, w)
+				warship, err := stresstest.New(targets.Online[i], debug, workers)
 				if err != nil {
 					fmt.Println("Failed to start Warship: ", targets.Online[i])
 				}
