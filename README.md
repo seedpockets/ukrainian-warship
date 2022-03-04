@@ -41,7 +41,7 @@ git clone https://github.com/seedpockets/ukrainian-warship.git
 cd ukrainian-warship/
 go build -ldflags "-s -w" -o /root/ukrainian-warship/bin/ukrainian-warship
 chmod +x /root/ukrainian-warship/bin/ukrainian-warship
-./root/ukrainian-warship/bin/ukrainian-warship kill
+/root/ukrainian-warship/bin/ukrainian-warship kill
 ```
 
 ##### Ubuntu Server 20.04 LTS
