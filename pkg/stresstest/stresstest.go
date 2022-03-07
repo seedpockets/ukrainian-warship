@@ -119,7 +119,8 @@ func (w *Warship) send() error {
 }
 
 func (w *Warship) addHeaders(r *http.Request) {
-	r.Header.Add("User-Agent", getUserAgent())
+	// r.Header.Add("User-Agent", getUserAgent())
+	r.Header.Add("User-Agent", "Mozilla/5.0 (Windows NT 6.2) AppleWebKit/535.7 (KHTML, like Gecko) Comodo_Dragon/16.1.1.0 Chrome/16.0.912.63 Safari/535.7")
 	r.Header.Add("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	r.Header.Add("Accept-Language", "en-us,en;q=0.5")
 	r.Header.Add("Accept-Encoding", "gzip,deflate")

