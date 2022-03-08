@@ -35,7 +35,8 @@ ukrainian-warship kill --target=https://tvzvezda.ru/ --workers=64
 ```
 ukrainian-warship kill --workers=64
 ``` 
-**--workers=64** number of workers specifies the number of concurrent calls for each URL
+**--workers=64** number of workers specifies the number of concurrent calls for each URL  
+**--debug=true** this flag an be added for more detailed output 
 # Install
 
 ##### Docker
