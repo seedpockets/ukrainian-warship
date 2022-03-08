@@ -1,6 +1,7 @@
 package fasttest
 
 import (
+	"fmt"
 	"io"
 	"sync/atomic"
 	"time"
@@ -25,10 +26,12 @@ type Fast struct {
 	host          string
 	URL           string
 	TotalRequests total
+	TotalErrors   total
 	bodProd       bodyStreamProducer
+	debug         bool
 }
 
-func New(url string) *Fast {
+func New(url string, debug bool) *Fast {
 	f := new(Fast)
 	readTimeout, _ := time.ParseDuration("500ms")
 	writeTimeout, _ := time.ParseDuration("500ms")
@@ -48,6 +51,7 @@ func New(url string) *Fast {
 	}
 	f.URL = url
 	f.client = c
+	f.debug = debug
 	return f
 }
 
@@ -62,9 +66,17 @@ func (c *Fast) Do() {
 	req.Header.Set("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8")
 	req.Header.Set("Accept-Encoding", "gzip,deflate")
 	req.Header.Set("Accept-Charset", "ISO-8859-1,utf-8;q=0.7,*;q=0.7")
-	_ = c.client.Do(req, resp)
-	// fmt.Println(resp.StatusCode())
-	//if err != nil {
-	//	fmt.Fprintf(os.Stderr, "ERR Connection error: %s\n", err)
-	//}
+	err := c.client.Do(req, resp)
+	if resp.StatusCode() < 400 {
+		c.TotalRequests.Inc()
+	}
+	if err != nil || resp.StatusCode() > 400 {
+		c.TotalErrors.Inc()
+	}
+	if c.debug {
+		if err != nil {
+			fmt.Println(err.Error())
+		}
+		fmt.Printf("Response status: %d, Target: %s\n", resp.StatusCode(), c.URL)
+	}
 }

@@ -2,8 +2,10 @@ package api_client
 
 import (
 	"encoding/json"
+	"fmt"
 	"io/ioutil"
 	"net/http"
+	"os"
 )
 
 func GetTargetsItArmyPpUa() (*TargetsItArmy, error) {
@@ -13,7 +15,12 @@ func GetTargetsItArmyPpUa() (*TargetsItArmy, error) {
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		t, fErr := targetsFromFile()
+		if fErr != nil {
+			return nil, err
+		}
+		fmt.Println("Could not get targets from api, using default targets from file...")
+		return t, nil
 	}
 
 	defer resp.Body.Close()
@@ -50,4 +57,19 @@ func GetTargets() (*Targets, error) {
 		return nil, err
 	}
 	return targets, nil
+}
+
+func targetsFromFile() (*TargetsItArmy, error) {
+	f, err := os.Open("default_targets.json")
+	if err != nil {
+		return nil, err
+	}
+	defer f.Close()
+	byteValue, _ := ioutil.ReadAll(f)
+	t := TargetsItArmy{}
+	err = json.Unmarshal(byteValue, &t)
+	if err != nil {
+		return nil, err
+	}
+	return &t, nil
 }

@@ -19,6 +19,23 @@ Ukrainian Warship features:
 <br>
 <br>
 
+# Usage
+
+There are two modes of attack, single target and auto. Unless a target is specified ukrainian-warship will start in auto.
+Auto attack acquires targets from a central api and takes aim at those.
+<br><br><br>
+**Single target example:**
+```
+ukrainian-warship kill --target=https://tvzvezda.ru/ --workers=64
+```
+**--target=https://tvzvezda.ru/** the url you want to attack  
+**--workers=64** number of workers specifies the number of concurrent calls to the URL
+<br><br><br>
+**Auto example:**
+```
+ukrainian-warship kill --workers=64
+``` 
+**--workers=64** number of workers specifies the number of concurrent calls for each URL
 # Install
 
 ##### Docker
