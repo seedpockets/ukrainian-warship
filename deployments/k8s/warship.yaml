@@ -23,4 +23,6 @@ spec:
       containers:
         - name: ukrainian-warship
           image: sunflowerpockets/ukrainian-warship:latest
+          args: ["kill", "--debug=true"]
           imagePullPolicy: Always
+

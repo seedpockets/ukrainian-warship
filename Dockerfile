@@ -14,4 +14,5 @@ COPY --from=builder /app/ukrainian-warship ./
 COPY --from=builder /app/default_targets.json ./
 
 # Command to run the executable
-CMD ["/app/ukrainian-warship", "kill", "--workers=24"]
+ENTRYPOINT ["/app/ukrainian-warship"]
+# CMD ["/app/ukrainian-warship", "kill", "--workers=24"]
