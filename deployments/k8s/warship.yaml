@@ -1,0 +1,26 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ukrainian-warship
+  labels:
+    run: ukrainian-warship
+    namespace: default
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ukrainian-warship
+  strategy:
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 1
+    type: RollingUpdate
+  template:
+    metadata:
+      labels:
+        app: ukrainian-warship
+    spec:
+      containers:
+        - name: ukrainian-warship
+          image: sunflowerpockets/ukrainian-warship:latest
+          imagePullPolicy: Always
