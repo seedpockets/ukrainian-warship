@@ -15,7 +15,9 @@ limitations under the License.
 */
 package main
 
-import "github.com/seedpockets/ukrainian-warship/cmd"
+import (
+	"github.com/seedpockets/ukrainian-warship/cmd"
+)
 
 func main() {
 	cmd.Execute()

